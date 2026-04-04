@@ -82,18 +82,39 @@ def capture_playwright_page(endpoint: str, filename: str) -> tuple[Path, int]:
     return out, len(stamped.encode())
 
 
+def capture_requests_page(endpoint: str, filename: str) -> tuple[Path, int]:
+    """Capture a plain HTTP PSX page via requests GET."""
+    url = f"{BASE_URL}/{endpoint}"
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    resp = session.get(url, timeout=30)
+    resp.raise_for_status()
+    stamped = stamp(url, resp.text)
+    out = FIXTURES_DIR / filename
+    out.write_text(stamped, encoding="utf-8")
+    return out, len(stamped.encode())
+
+
 FIXTURES = {
     "historical_engro": {
         "description": "/historical ENGRO (requests POST)",
         "fn": lambda: capture_historical_engro(),
     },
     "trading_panel": {
-        "description": "/trading-panel (Playwright JS-rendered)",
-        "fn": lambda: capture_playwright_page("trading-panel", "trading_panel.html"),
+        "description": "/trading-panel (requests GET — plain HTTP)",
+        "fn": lambda: capture_requests_page("trading-panel", "trading_panel.html"),
     },
     "screener": {
-        "description": "/screener (Playwright JS-rendered)",
-        "fn": lambda: capture_playwright_page("screener", "screener.html"),
+        "description": "/screener (requests GET — plain HTTP)",
+        "fn": lambda: capture_requests_page("screener", "screener.html"),
+    },
+    "sector_summary": {
+        "description": "/sector-summary (Playwright JS-rendered)",
+        "fn": lambda: capture_playwright_page("sector-summary", "sector_summary.html"),
+    },
+    "financial_reports": {
+        "description": "/financial-reports (Playwright JS-rendered)",
+        "fn": lambda: capture_playwright_page("financial-reports", "financial_reports.html"),
     },
 }
 
