@@ -5,13 +5,14 @@ on:
     tags:
       - "v*"
 
-permissions:
-  id-token: write
+permissions: {}
 
 jobs:
   build:
     name: Build distribution
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +37,8 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC token for trusted PyPI publish — only this job needs it
     environment:
       name: pypi
       url: https://pypi.org/project/psxdata/
