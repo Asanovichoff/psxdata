@@ -19,6 +19,8 @@ ENDPOINTS: dict[str, str] = {
     "eligible_scrips": "/eligible-scrips",
 }
 
+# Single well-formed User-Agent — PSX showed no UA-based blocking in Phase 0.
+# Add rotation here if PSX starts blocking (raise a GitHub issue first).
 REQUEST_HEADERS: dict[str, str] = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -37,13 +39,15 @@ REQUEST_TIMEOUT: int = 30  # seconds
 # Retry
 # ---------------------------------------------------------------------------
 MAX_RETRIES: int = 3
-RETRY_DELAYS: tuple[int, ...] = (1, 2, 4)  # seconds, exponential backoff
+# Delays between attempts: len must equal MAX_RETRIES - 1
+# (no sleep after the final attempt — we raise immediately)
+RETRY_DELAYS: tuple[int, ...] = (1, 2)  # seconds between attempt 1→2 and 2→3
 
 # Invariant — uses explicit raise, not assert (assert is stripped with python -O)
-if len(RETRY_DELAYS) != MAX_RETRIES:
+if len(RETRY_DELAYS) != MAX_RETRIES - 1:
     raise ValueError(
         f"constants.py misconfigured: len(RETRY_DELAYS)={len(RETRY_DELAYS)} "
-        f"must equal MAX_RETRIES={MAX_RETRIES}"
+        f"must equal MAX_RETRIES-1={MAX_RETRIES - 1}"
     )
 
 # ---------------------------------------------------------------------------

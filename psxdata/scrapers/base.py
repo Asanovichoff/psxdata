@@ -20,6 +20,7 @@ from playwright.sync_api import Page, sync_playwright
 from psxdata.constants import (
     BASE_URL,
     ENDPOINTS,
+    MAX_REQUESTS_PER_SECOND,
     MAX_RETRIES,
     REQUEST_HEADERS,
     REQUEST_TIMEOUT,
@@ -32,7 +33,7 @@ from psxdata.exceptions import (
     PSXRateLimitError,
     PSXServerError,
 )
-from psxdata.utils import MAX_REQUESTS_PER_SECOND, RateLimiter
+from psxdata.utils import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -102,16 +103,17 @@ class BaseScraper:
                         f"attempt {attempt}/{MAX_RETRIES}"
                     )
                     if attempt < MAX_RETRIES:
-                        time.sleep(RETRY_DELAYS[attempt - 1])
+                        time.sleep(RETRY_DELAYS[attempt - 1])  # delays[0]=1s, delays[1]=2s
                         continue
-                    raise last_exc
+                    raise last_exc  # final attempt — raise immediately, no sleep
                 if 400 <= resp.status_code < 500:
                     raise PSXParseError(
                         f"Unexpected {resp.status_code} from {url}"
                     )
                 return resp
 
-            except (requests.ConnectionError, requests.Timeout) as exc:
+            except requests.RequestException as exc:
+                # Catches ConnectionError, Timeout, SSLError, ChunkedEncodingError, etc.
                 last_exc = exc
                 logger.debug(
                     "Network error on attempt %d/%d: %s", attempt, MAX_RETRIES, exc

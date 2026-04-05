@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from psxdata.constants import COLUMN_MAP
 from psxdata.parsers.normalizers import normalize_column_name
@@ -16,19 +16,19 @@ from psxdata.parsers.normalizers import normalize_column_name
 logger = logging.getLogger(__name__)
 
 
-def extract_table_headers(soup: BeautifulSoup) -> list[str]:
-    """Extract and normalise column headers from the first table in soup.
+def extract_table_headers(table: Tag) -> list[str]:
+    """Extract and normalise column headers from a single table element.
 
     Applies COLUMN_MAP first; unknown headers fall back to
     normalize_column_name with a warning logged.
 
     Args:
-        soup: Parsed HTML document.
+        table: A single <table> BeautifulSoup element.
 
     Returns:
         List of normalised column name strings.
     """
-    th_tags = soup.find_all("th")
+    th_tags = table.find_all("th")
     if not th_tags:
         return []
     headers: list[str] = []
@@ -49,22 +49,22 @@ def extract_table_headers(soup: BeautifulSoup) -> list[str]:
     return headers
 
 
-def parse_table_rows(soup: BeautifulSoup, headers: list[str]) -> list[dict[str, str]]:
+def parse_table_rows(table: Tag, headers: list[str]) -> list[dict[str, str]]:
     """Map <tr><td> rows to dicts keyed by normalised header name.
 
     Rows with a different cell count than headers get a warning logged but
     are still returned with available cells mapped.
 
     Args:
-        soup: Parsed HTML document.
+        table: A single <table> BeautifulSoup element.
         headers: Normalised column names from extract_table_headers.
 
     Returns:
         List of row dicts mapping header name -> raw cell text.
     """
     rows: list[dict[str, str]] = []
-    tbody = soup.find("tbody")
-    tr_tags = tbody.find_all("tr") if tbody else soup.find_all("tr")
+    tbody = table.find("tbody")
+    tr_tags = tbody.find_all("tr") if tbody else table.find_all("tr")
 
     for tr in tr_tags:
         cells = [td.get_text(strip=True) for td in tr.find_all("td")]
@@ -84,6 +84,8 @@ def parse_table_rows(soup: BeautifulSoup, headers: list[str]) -> list[dict[str, 
 def parse_html_table(html: str) -> list[dict[str, str]]:
     """Parse the first HTML table in html, returning rows as normalised dicts.
 
+    Both headers and rows are scoped to the same first <table> element,
+    preventing column/row mismatch on pages with multiple tables.
     Returns an empty list for empty or malformed HTML with a warning logged.
     All values are raw strings — callers apply coerce_numeric / parse_date_safely.
 
@@ -94,8 +96,12 @@ def parse_html_table(html: str) -> list[dict[str, str]]:
         List of row dicts. Each dict maps normalised column name -> raw string value.
     """
     soup = BeautifulSoup(html, "lxml")
-    headers = extract_table_headers(soup)
+    table = soup.find("table")
+    if not table:
+        logger.warning("No table found in HTML — returning empty result")
+        return []
+    headers = extract_table_headers(table)
     if not headers:
         logger.warning("No table headers found in HTML — returning empty result")
         return []
-    return parse_table_rows(soup, headers)
+    return parse_table_rows(table, headers)

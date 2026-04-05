@@ -13,6 +13,14 @@ from psxdata.utils import RateLimiter, chunk_date_range, validate_ohlc_dataframe
 # ---------------------------------------------------------------------------
 
 class TestChunkDateRange:
+    def test_zero_chunk_days_raises(self):
+        with pytest.raises(ValueError, match="chunk_days"):
+            chunk_date_range(date(2024, 1, 1), date(2024, 12, 31), chunk_days=0)
+
+    def test_negative_chunk_days_raises(self):
+        with pytest.raises(ValueError, match="chunk_days"):
+            chunk_date_range(date(2024, 1, 1), date(2024, 12, 31), chunk_days=-1)
+
     def test_single_year_range(self):
         chunks = chunk_date_range(date(2023, 1, 1), date(2023, 12, 31))
         assert chunks == [(date(2023, 1, 1), date(2023, 12, 31))]
@@ -67,6 +75,14 @@ class TestChunkDateRange:
 # ---------------------------------------------------------------------------
 
 class TestRateLimiter:
+    def test_zero_max_per_second_raises(self):
+        with pytest.raises(ValueError, match="max_per_second"):
+            RateLimiter(max_per_second=0)
+
+    def test_negative_max_per_second_raises(self):
+        with pytest.raises(ValueError, match="max_per_second"):
+            RateLimiter(max_per_second=-1)
+
     def test_allows_first_request_immediately(self):
         calls = []
         mock_time = [0.0]
@@ -142,6 +158,11 @@ def _make_df(rows):
 
 
 class TestValidateOHLCDataframe:
+    def test_missing_required_column_raises(self):
+        df = pd.DataFrame({"open": [100.0], "close": [105.0]})  # missing high/low/volume
+        with pytest.raises(ValueError, match="missing required"):
+            validate_ohlc_dataframe(df)
+
     def _valid_row(self, date_str="2024-01-01"):
         return {
             "date": pd.Timestamp(date_str),

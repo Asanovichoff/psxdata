@@ -47,6 +47,8 @@ def chunk_date_range(
     """
     if start > end:
         raise ValueError(f"start ({start}) must be <= end ({end})")
+    if chunk_days < 1:
+        raise ValueError(f"chunk_days must be >= 1, got {chunk_days}")
     chunks: list[tuple[date, date]] = []
     current = start
     while current <= end:
@@ -61,7 +63,7 @@ def chunk_date_range(
 # ---------------------------------------------------------------------------
 
 class RateLimiter:
-    """Thread-safe token-bucket rate limiter.
+    """Thread-safe fixed-interval rate limiter (leaky-bucket style).
 
     Args:
         max_per_second: Maximum requests allowed per second.
@@ -83,6 +85,8 @@ class RateLimiter:
         time_func: Callable[[], float] = _time.monotonic,
         sleep_func: Callable[[float], None] = _time.sleep,
     ) -> None:
+        if max_per_second <= 0:
+            raise ValueError(f"max_per_second must be > 0, got {max_per_second}")
         self._interval = 1.0 / max_per_second
         self._time = time_func
         self._sleep = sleep_func
@@ -120,6 +124,11 @@ def validate_ohlc_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Cleaned DataFrame with ``is_anomaly`` column added.
     """
+    required_columns = {"open", "high", "low", "close", "volume"}
+    missing = required_columns - set(df.columns)
+    if missing:
+        raise ValueError(f"DataFrame missing required OHLCV columns: {sorted(missing)}")
+
     if df.empty:
         df = df.copy()
         df["is_anomaly"] = pd.Series(dtype=bool)
