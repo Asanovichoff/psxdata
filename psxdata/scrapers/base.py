@@ -1,8 +1,13 @@
 """BaseScraper — foundation class for all psxdata scrapers.
 
-Scraping modes provided:
+Scraping mode:
   - requests + BeautifulSoup: via _get() / _post()
-  - Playwright (JS-rendered): via _playwright_page() context manager
+
+All PSX endpoints are accessible via plain HTTP requests to AJAX endpoints.
+Playwright is no longer needed for scraping (see issue #31).
+
+The _playwright_page() method is retained for tooling (e.g. endpoint discovery)
+but is deprecated for scraper use.
 
 All Phase 3 scrapers inherit from BaseScraper.
 """
@@ -140,16 +145,19 @@ class BaseScraper:
 
     @contextmanager
     def _playwright_page(self) -> Generator[Page, None, None]:
-        """Context manager providing a Playwright Page for JS-rendered endpoints.
+        """Context manager providing a Playwright Page.
+
+        .. deprecated::
+            All PSX endpoints now have plain HTTP AJAX equivalents.
+            Scrapers should use _get() / _post() instead. This method
+            is retained only for tooling (e.g. AJAX endpoint discovery).
+            See issue #31 for details.
 
         Usage::
 
             with self._playwright_page() as page:
                 page.goto(url, wait_until="networkidle")
                 html = page.content()
-
-        TimeoutError from Playwright propagates as-is — Phase 3 scrapers
-        should catch and re-raise as PSXUnavailableError.
         """
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
