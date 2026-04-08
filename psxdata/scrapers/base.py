@@ -50,7 +50,11 @@ class BaseScraper:
     - Persistent requests.Session with standard PSX headers
     - Exponential backoff retry (MAX_RETRIES attempts, RETRY_DELAYS seconds)
     - Thread-safe rate limiter (MAX_REQUESTS_PER_SECOND)
-    - Playwright context manager for JS-rendered endpoints
+
+    Note:
+        Playwright support is deprecated for scraper use. All PSX endpoints
+        are accessible via plain HTTP AJAX requests. _playwright_page() is
+        retained only for tooling (AJAX endpoint discovery). See issue #31.
     """
 
     def __init__(self) -> None:
