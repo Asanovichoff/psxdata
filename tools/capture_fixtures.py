@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""
-PSX HTML fixture capture tool.
+"""Capture PSX HTML/JSON fixtures from AJAX endpoints for unit tests.
 
-Captures static HTML snapshots of PSX endpoints for use in unit tests.
-Run during Phase 0 or any time PSX changes a page structure.
+All captures use plain requests — no Playwright needed.
+Run when PSX changes a page structure or on demand to refresh fixtures.
 
 Usage:
-    python tools/capture_fixtures.py                           # capture all fixtures
-    python tools/capture_fixtures.py --fixture trading_panel   # capture one fixture
+    python tools/capture_fixtures.py                             # capture all
+    python tools/capture_fixtures.py --fixture screener          # capture one
+    python tools/capture_fixtures.py --list                      # list available
 """
 
 import argparse
+import json
 import sys
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import requests
-from playwright.sync_api import sync_playwright
 
 FIXTURES_DIR = Path(__file__).parent.parent / "tests" / "fixtures"
 
@@ -34,107 +34,164 @@ HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
-END_DATE = date.today()
-START_DATE = END_DATE - timedelta(days=30)
+
+def _session() -> requests.Session:
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    return s
 
 
-def stamp(url: str, html: str) -> str:
-    """Prepend metadata comment to captured HTML."""
+def _stamp_html(url: str, html: str) -> str:
     today = date.today()
-    comment = (
-        f"<!-- Captured: {today} | Source: {url} | Phase 0 probe -->\n"
-        "<!-- If unit tests pass but integration tests fail, this fixture may be stale."
-        " Re-capture with: -->\n"
-        "<!-- python tools/capture_fixtures.py -->\n"
+    return (
+        f"<!-- Captured: {today} | Source: {url} -->\n"
+        "<!-- Re-capture: python tools/capture_fixtures.py -->\n"
+        + html
     )
-    return comment + html
 
 
-def capture_historical_engro() -> tuple[Path, int]:
-    """Capture /historical ENGRO response via requests POST."""
-    url = f"{BASE_URL}/historical"
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    resp = session.post(
-        url,
-        data={"symbol": "ENGRO", "start": str(START_DATE), "end": str(END_DATE)},
-        timeout=30,
+def _stamp_json(url: str, data: object) -> str:
+    today = date.today()
+    return json.dumps(
+        {"_meta": {"captured": str(today), "source": url}, "data": data},
+        indent=2,
     )
+
+
+def _capture_get_html(endpoint: str, filename: str) -> tuple[Path, int]:
+    url = f"{BASE_URL}{endpoint}"
+    resp = _session().get(url, timeout=30)
     resp.raise_for_status()
-    html = stamp(url, resp.text)
-    out = FIXTURES_DIR / "historical_engro.html"
-    out.write_text(html, encoding="utf-8")
-    return out, len(html.encode())
-
-
-def capture_playwright_page(endpoint: str, filename: str) -> tuple[Path, int]:
-    """Capture a JS-rendered PSX page via Playwright."""
-    url = f"{BASE_URL}/{endpoint}"
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(extra_http_headers=HEADERS)
-        page.goto(url, timeout=30000, wait_until="networkidle")
-        html = page.content()
-        browser.close()
-    stamped = stamp(url, html)
+    content = _stamp_html(url, resp.text)
     out = FIXTURES_DIR / filename
-    out.write_text(stamped, encoding="utf-8")
-    return out, len(stamped.encode())
+    out.write_text(content, encoding="utf-8")
+    return out, len(content.encode())
 
 
-def capture_requests_page(endpoint: str, filename: str) -> tuple[Path, int]:
-    """Capture a plain HTTP PSX page via requests GET."""
-    url = f"{BASE_URL}/{endpoint}"
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    resp = session.get(url, timeout=30)
+def _capture_post_html(
+    endpoint: str, data: dict, filename: str
+) -> tuple[Path, int]:
+    url = f"{BASE_URL}{endpoint}"
+    resp = _session().post(url, data=data, timeout=30)
     resp.raise_for_status()
-    stamped = stamp(url, resp.text)
+    content = _stamp_html(url, resp.text)
     out = FIXTURES_DIR / filename
-    out.write_text(stamped, encoding="utf-8")
-    return out, len(stamped.encode())
+    out.write_text(content, encoding="utf-8")
+    return out, len(content.encode())
+
+
+def _capture_get_json(endpoint: str, filename: str) -> tuple[Path, int]:
+    url = f"{BASE_URL}{endpoint}"
+    resp = _session().get(url, timeout=30)
+    resp.raise_for_status()
+    content = _stamp_json(url, resp.json())
+    out = FIXTURES_DIR / filename
+    out.write_text(content, encoding="utf-8")
+    return out, len(content.encode())
 
 
 FIXTURES = {
     "historical_engro": {
-        "description": "/historical ENGRO (requests POST)",
-        "fn": lambda: capture_historical_engro(),
+        "description": "POST /historical {symbol: ENGRO}",
+        "fn": lambda: _capture_post_html(
+            "/historical", {"symbol": "ENGRO"}, "historical_engro.html"
+        ),
     },
-    "trading_panel": {
-        "description": "/trading-panel (requests GET — plain HTTP)",
-        "fn": lambda: capture_requests_page("trading-panel", "trading_panel.html"),
+    "trading_board_reg_main": {
+        "description": "GET /trading-board/REG/main",
+        "fn": lambda: _capture_get_html(
+            "/trading-board/REG/main", "trading_board_reg_main.html"
+        ),
     },
-    "screener": {
-        "description": "/screener (requests GET — plain HTTP)",
-        "fn": lambda: capture_requests_page("screener", "screener.html"),
+    "trading_board_reg_gem": {
+        "description": "GET /trading-board/REG/gem",
+        "fn": lambda: _capture_get_html(
+            "/trading-board/REG/gem", "trading_board_reg_gem.html"
+        ),
+    },
+    "trading_board_bnb_bnb": {
+        "description": "GET /trading-board/BNB/bnb",
+        "fn": lambda: _capture_get_html(
+            "/trading-board/BNB/bnb", "trading_board_bnb_bnb.html"
+        ),
+    },
+    "symbols": {
+        "description": "GET /symbols (JSON)",
+        "fn": lambda: _capture_get_json("/symbols", "symbols.json"),
     },
     "sector_summary": {
-        "description": "/sector-summary (Playwright JS-rendered)",
-        "fn": lambda: capture_playwright_page("sector-summary", "sector_summary.html"),
+        "description": "GET /sector-summary/sectorwise",
+        "fn": lambda: _capture_get_html(
+            "/sector-summary/sectorwise", "sector_summary.html"
+        ),
     },
     "financial_reports": {
-        "description": "/financial-reports (Playwright JS-rendered)",
-        "fn": lambda: capture_playwright_page("financial-reports", "financial_reports.html"),
+        "description": "GET /financial-reports-list",
+        "fn": lambda: _capture_get_html(
+            "/financial-reports-list", "financial_reports.html"
+        ),
+    },
+    "indices_kse100": {
+        "description": "GET /indices/KSE100",
+        "fn": lambda: _capture_get_html(
+            "/indices/KSE100", "indices_kse100.html"
+        ),
+    },
+    "screener": {
+        "description": "GET /screener",
+        "fn": lambda: _capture_get_html("/screener", "screener.html"),
+    },
+    "debt_market": {
+        "description": "GET /debt-market",
+        "fn": lambda: _capture_get_html("/debt-market", "debt_market.html"),
+    },
+    "eligible_scrips": {
+        "description": "GET /eligible-scrips",
+        "fn": lambda: _capture_get_html(
+            "/eligible-scrips", "eligible_scrips.html"
+        ),
+    },
+    "trading_panel": {
+        "description": "GET /trading-panel (index summary tables)",
+        "fn": lambda: _capture_get_html(
+            "/trading-panel", "trading_panel.html"
+        ),
     },
 }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Capture PSX HTML fixtures for unit tests")
+    parser = argparse.ArgumentParser(
+        description="Capture PSX HTML/JSON fixtures for unit tests"
+    )
     parser.add_argument(
         "--fixture",
         choices=list(FIXTURES.keys()),
         help="Capture only this fixture",
     )
+    parser.add_argument(
+        "--list", action="store_true", help="List available fixtures"
+    )
     args = parser.parse_args()
+
+    if args.list:
+        for name, spec in FIXTURES.items():
+            print(f"  {name:<30} {spec['description']}")
+        return
 
     FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
 
-    targets = {args.fixture: FIXTURES[args.fixture]} if args.fixture else FIXTURES
+    targets = (
+        {args.fixture: FIXTURES[args.fixture]} if args.fixture else FIXTURES
+    )
     failed = False
 
     for name, spec in targets.items():
-        print(f"  Capturing {name} ({spec['description']}) ...", end=" ", flush=True)
+        print(
+            f"  Capturing {name} ({spec['description']}) ...",
+            end=" ",
+            flush=True,
+        )
         try:
             path, size = spec["fn"]()
             print(f"done — {path} ({size:,} bytes)")
