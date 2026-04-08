@@ -23,7 +23,7 @@ class TestEndpoints:
         assert ENDPOINTS["financial_reports"] == "/financial-reports-list"
         assert ENDPOINTS["indices"] == "/indices"
 
-    def test_page_endpoints_still_present(self):
+    def test_all_endpoints_still_present(self):
         assert "historical" in ENDPOINTS
         assert "trading_panel" in ENDPOINTS
         assert "screener" in ENDPOINTS
