@@ -86,13 +86,17 @@ class TestDiffSchemasRowCountDrift:
         base = _baseline({"ep": _result("ep", ["DATE"], row_count=10)})
         live = [_result("ep", ["DATE"], row_count=0)]
         diffs = diff_schemas(live, base)
-        assert any("row" in d.lower() or "ROW" in d for d in diffs)
+        assert len(diffs) == 1
+        assert diffs[0].startswith("!")
+        assert "row" in diffs[0].lower() or "ROW" in diffs[0]
 
     def test_zero_to_nonzero_row_count_flagged(self):
         base = _baseline({"ep": _result("ep", ["DATE"], row_count=0)})
         live = [_result("ep", ["DATE"], row_count=50)]
         diffs = diff_schemas(live, base)
-        assert any("row" in d.lower() or "ROW" in d for d in diffs)
+        assert len(diffs) == 1
+        assert diffs[0].startswith("!")
+        assert "row" in diffs[0].lower() or "ROW" in diffs[0]
 
 
 class TestDiffSchemasStatusDrift:
@@ -121,8 +125,8 @@ class TestDiffSchemasEndpointPresence:
         base = _baseline({"ep": _result("ep", ["DATE"])})
         live = [{"name": "ep", "error": "Connection timeout"}]
         diffs = diff_schemas(live, base)
-        assert len(diffs) >= 1
-        assert any("ep" in d for d in diffs)
+        assert len(diffs) == 1
+        assert "ep" in diffs[0]
 
     def test_new_endpoint_not_in_baseline_not_in_diffs(self):
         """New endpoint in live but not in baseline goes to info only."""
