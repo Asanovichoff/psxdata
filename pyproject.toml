@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psxdata"
-version = "0.1.0a1"
+version = "0.1.0a2"
 description = "Python library and REST API for Pakistan Stock Exchange (PSX) data"
 readme = "README.md"
 requires-python = ">=3.11"
