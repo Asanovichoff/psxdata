@@ -3,4 +3,4 @@ title: Changelog
 description: psxdata release history and version changelog.
 ---
 
-Coming soon.
+--8<-- "CHANGELOG.md"
