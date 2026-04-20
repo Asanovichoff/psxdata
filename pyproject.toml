@@ -54,12 +54,17 @@ dev = [
     "types-requests>=2.28",
     "types-python-dateutil>=2.8",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+]
 
 [project.urls]
 Homepage = "https://github.com/mtauha/psxdata"
 Source = "https://github.com/mtauha/psxdata"
 "Bug Tracker" = "https://github.com/mtauha/psxdata/issues"
 Changelog = "https://github.com/mtauha/psxdata/blob/main/CHANGELOG.md"
+Documentation = "https://psxdata.readthedocs.io/"
 
 [tool.setuptools.packages.find]
 where = ["."]
